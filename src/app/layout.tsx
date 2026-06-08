@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
+import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 
 const geist = Geist({ variable: "--font-sans", subsets: ["latin"] });
 
@@ -29,6 +30,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="h-full bg-background antialiased">
         {children}
         <Toaster richColors position="top-center" />
+        <ServiceWorkerRegister />
       </body>
     </html>
   );
