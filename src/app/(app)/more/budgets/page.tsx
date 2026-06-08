@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
+import type { Budget, Category } from "@prisma/client";
 import { BudgetsManager } from "@/components/budgets/BudgetsManager";
 
 export default async function BudgetsPage() {
@@ -41,7 +42,7 @@ export default async function BudgetsPage() {
         <h1 className="text-lg font-semibold">Budgets</h1>
       </div>
       <BudgetsManager
-        budgets={budgets.map((b) => ({ ...b, amount: Number(b.amount) }))}
+        budgets={budgets.map((b: Budget & { category: Category | null }) => ({ ...b, amount: Number(b.amount) }))}
         categories={expenseCategories}
         spending={spending.reduce<Record<string, number>>((acc, s) => {
           acc[s.categoryId ?? "__overall"] = Number(s._sum.amount ?? 0);

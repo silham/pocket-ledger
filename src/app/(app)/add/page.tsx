@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
+import type { WalletAccount } from "@prisma/client";
 import { AddTransactionForm } from "@/components/transactions/AddTransactionForm";
 
 export default async function AddPage() {
@@ -14,7 +15,7 @@ export default async function AddPage() {
     prisma.person.findMany({ where: { userId: session.user.id, isArchived: false }, orderBy: { name: "asc" } }),
   ]);
 
-  const serializedAccounts = accounts.map((a) => ({ ...a, balance: Number(a.balance) }));
+  const serializedAccounts = accounts.map((a: WalletAccount) => ({ ...a, balance: Number(a.balance) }));
 
   return (
     <div className="flex flex-col min-h-full">
