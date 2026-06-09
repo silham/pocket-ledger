@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { revalidateAfterTransaction } from "@/app/actions/revalidate";
 
 interface Props {
   id: string;
@@ -20,6 +21,7 @@ export function TransactionDeleteButton({ id, onDelete }: Props) {
     if (res.ok) {
       toast.success("Transaction deleted");
       onDelete(id);
+      await revalidateAfterTransaction();
     } else {
       toast.error("Failed to delete");
     }

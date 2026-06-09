@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import { revalidateAfterTransaction } from "@/app/actions/revalidate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -83,8 +84,8 @@ export function AddTransactionForm({ accounts, expenseCategories, incomeCategori
 
     toast.success("Transaction saved");
     reset({ date: new Date().toISOString().slice(0, 10) });
+    await revalidateAfterTransaction();
     router.push("/");
-    router.refresh();
   }
 
   return (
