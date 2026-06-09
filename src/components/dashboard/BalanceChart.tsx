@@ -19,6 +19,13 @@ function formatLKR(v: number) {
 }
 
 export function BalanceChart({ data }: Props) {
+  const values = data.map((d) => d.balance);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const pad = Math.max((max - min) * 0.12, 500);
+  const yMin = Math.floor((min - pad) / 500) * 500;
+  const yMax = Math.ceil((max + pad) / 500) * 500;
+
   return (
     <Card>
       <CardHeader className="pb-2 pt-4 px-4">
@@ -41,6 +48,7 @@ export function BalanceChart({ data }: Props) {
               tickLine={false}
               axisLine={false}
               width={52}
+              domain={[yMin, yMax]}
             />
             <Tooltip
               formatter={(v) => [`Rs. ${Number(v).toLocaleString()}`, "Balance"]}

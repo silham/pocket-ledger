@@ -18,7 +18,7 @@ export default async function PersonLedgerPage({ params }: { params: Promise<{ i
       type: { in: ["LEND", "BORROW", "SETTLEMENT_RECEIVED", "SETTLEMENT_PAID"] },
     },
     include: { account: true },
-    orderBy: { date: "desc" },
+    orderBy: [{ date: "desc" }, { createdAt: "desc" }],
   });
   const transactions = raw.map((t) => ({
     ...t,

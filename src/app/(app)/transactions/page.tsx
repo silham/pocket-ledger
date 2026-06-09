@@ -10,7 +10,7 @@ export default async function TransactionsPage() {
   const raw = await prisma.transaction.findMany({
     where: { userId: session.user.id },
     include: { account: true, toAccount: true, category: true, person: true },
-    orderBy: { date: "desc" },
+    orderBy: [{ date: "desc" }, { createdAt: "desc" }],
     take: 100,
   });
   const transactions = raw.map((t) => ({

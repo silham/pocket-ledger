@@ -46,7 +46,7 @@ export default async function DashboardPage() {
       prisma.transaction.findMany({
         where: { userId },
         include: { account: true, category: true, person: true },
-        orderBy: { date: "desc" },
+        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
         take: 10,
       }),
 
@@ -59,7 +59,7 @@ export default async function DashboardPage() {
       // All transactions in last 30 days for balance timeline
       prisma.transaction.findMany({
         where: { userId, date: { gte: thirtyDaysAgo } },
-        orderBy: { date: "asc" },
+        orderBy: [{ date: "asc" }, { createdAt: "asc" }],
         select: { date: true, type: true, amount: true },
       }),
 
@@ -102,7 +102,7 @@ export default async function DashboardPage() {
     d.setDate(d.getDate() + i);
     const key = d.toISOString().slice(0, 10);
     running += txByDate.get(key) ?? 0;
-    const label = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    const label = `${d.getMonth() + 1}/${d.getDate()}`;
     days.push({ label, balance: Math.round(running) });
   }
 
