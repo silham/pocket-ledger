@@ -12,25 +12,28 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Category, Person, WalletAccount } from "@prisma/client";
 
 type SerializedAccount = Omit<WalletAccount, "balance"> & { balance: number };
 
+const ACCOUNT_ICONS: Record<string, string> = {
+  CASH: "💵", BANK: "🏦", WALLET: "👝", SAVINGS: "🐷", CREDIT_CARD: "💳", OTHER: "📦",
+};
+
 const TX_TYPES = [
-  { value: "EXPENSE", label: "Expense", color: "bg-red-500" },
-  { value: "INCOME", label: "Income", color: "bg-emerald-500" },
-  { value: "TRANSFER", label: "Transfer", color: "bg-blue-500" },
-  { value: "LEND", label: "Lend", color: "bg-orange-500" },
-  { value: "BORROW", label: "Borrow", color: "bg-purple-500" },
-  { value: "SETTLEMENT_RECEIVED", label: "Received", color: "bg-teal-500" },
-  { value: "SETTLEMENT_PAID", label: "Paid Back", color: "bg-pink-500" },
+  { value: "EXPENSE",            label: "Expense",   color: "bg-red-500" },
+  { value: "INCOME",             label: "Income",    color: "bg-emerald-500" },
+  { value: "TRANSFER",           label: "Transfer",  color: "bg-blue-500" },
+  { value: "LEND",               label: "Lend",      color: "bg-orange-500" },
+  { value: "BORROW",             label: "Borrow",    color: "bg-purple-500" },
+  { value: "SETTLEMENT_RECEIVED",label: "Received",  color: "bg-teal-500" },
+  { value: "SETTLEMENT_PAID",    label: "Paid Back", color: "bg-pink-500" },
 ];
 
 const schema = z.object({
   amount: z.string().min(1, "Required").refine((v) => !isNaN(parseFloat(v)) && parseFloat(v) > 0, "Must be positive"),
   date: z.string().min(1, "Required"),
-  accountId: z.string().min(1, "Required"),
+  accountId: z.string().min(1, "Select an account"),
   toAccountId: z.string().optional(),
   categoryId: z.string().optional(),
   personId: z.string().optional(),
@@ -46,6 +49,48 @@ interface Props {
   people: Person[];
 }
 
+function AccountCard({
+  account, selected, onSelect, showBalance = true,
+}: {
+  account: SerializedAccount; selected: boolean; onSelect: () => void; showBalance?: boolean;
+}) {
+  const icon = account.icon ?? ACCOUNT_ICONS[account.type] ?? "📦";
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={`flex flex-col items-start gap-1 p-3 rounded-xl border-2 min-w-27.5 shrink-0 transition-all ${
+        selected ? "border-indigo-600 bg-indigo-50 dark:bg-indigo-950/30" : "border-border bg-muted/30"
+      }`}
+    >
+      <span className="text-xl">{icon}</span>
+      <span className="text-xs font-semibold leading-tight truncate w-full">{account.name}</span>
+      {showBalance && (
+        <span className={`text-[10px] font-medium ${account.balance >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+          Rs. {account.balance.toLocaleString()}
+        </span>
+      )}
+    </button>
+  );
+}
+
+function PersonCard({ person, selected, onSelect }: { person: Person; selected: boolean; onSelect: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border-2 transition-all ${
+        selected ? "border-indigo-600 bg-indigo-50 dark:bg-indigo-950/30" : "border-border bg-muted/30"
+      }`}
+    >
+      <span className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center text-sm font-bold text-indigo-700 dark:text-indigo-300 shrink-0">
+        {person.name[0].toUpperCase()}
+      </span>
+      <span className="text-sm font-medium truncate">{person.name}</span>
+    </button>
+  );
+}
+
 export function AddTransactionForm({ accounts, expenseCategories, incomeCategories, people }: Props) {
   const router = useRouter();
   const [type, setType] = useState("EXPENSE");
@@ -56,10 +101,22 @@ export function AddTransactionForm({ accounts, expenseCategories, incomeCategori
     defaultValues: { date: new Date().toISOString().slice(0, 10) },
   });
 
+  const accountId = watch("accountId");
+  const toAccountId = watch("toAccountId");
+  const categoryId = watch("categoryId");
+  const personId = watch("personId");
+
   const needsCategory = type === "EXPENSE" || type === "INCOME";
   const needsToAccount = type === "TRANSFER";
   const needsPerson = ["LEND", "BORROW", "SETTLEMENT_RECEIVED", "SETTLEMENT_PAID"].includes(type);
   const categories = type === "INCOME" ? incomeCategories : expenseCategories;
+
+  function changeType(next: string) {
+    setType(next);
+    setValue("categoryId", "");
+    setValue("personId", "");
+    setValue("toAccountId", "");
+  }
 
   async function onSubmit(data: FormData) {
     setLoading(true);
@@ -89,14 +146,15 @@ export function AddTransactionForm({ accounts, expenseCategories, incomeCategori
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4 p-4">
-      {/* Type selector */}
+    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5 p-4 pb-8">
+
+      {/* Transaction type */}
       <div className="grid grid-cols-4 gap-2">
         {TX_TYPES.map(({ value, label, color }) => (
           <button
             key={value}
             type="button"
-            onClick={() => { setType(value); setValue("categoryId", ""); setValue("personId", ""); setValue("toAccountId", ""); }}
+            onClick={() => changeType(value)}
             className={`py-2 rounded-xl text-xs font-medium transition-all border-2 ${
               type === value
                 ? `${color} text-white border-transparent shadow-md`
@@ -124,50 +182,48 @@ export function AddTransactionForm({ accounts, expenseCategories, incomeCategori
       {/* Date */}
       <div className="space-y-1.5">
         <Label htmlFor="date">Date</Label>
-        <Input id="date" type="date" {...register("date")} />
-        {errors.date && <p className="text-xs text-destructive">{errors.date.message}</p>}
+        <Input id="date" type="date" className="h-11" {...register("date")} />
       </div>
 
       {/* Account */}
-      <div className="space-y-1.5">
+      <div className="space-y-2">
         <Label>{needsToAccount ? "From Account" : "Account"}</Label>
-        <Select onValueChange={(v: string | null) => setValue("accountId", v ?? "")}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select account" />
-          </SelectTrigger>
-          <SelectContent>
-            {accounts.map((a) => (
-              <SelectItem key={a.id} value={a.id}>
-                {a.icon ?? ""} {a.name} · Rs. {Number(a.balance).toLocaleString()}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+          {accounts.map((a) => (
+            <AccountCard
+              key={a.id}
+              account={a}
+              selected={accountId === a.id}
+              onSelect={() => setValue("accountId", a.id, { shouldValidate: true })}
+            />
+          ))}
+        </div>
         {errors.accountId && <p className="text-xs text-destructive">{errors.accountId.message}</p>}
       </div>
 
       {/* To Account (Transfer) */}
       {needsToAccount && (
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           <Label>To Account</Label>
-          <Select onValueChange={(v: string | null) => setValue("toAccountId", v ?? undefined)}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select destination" />
-            </SelectTrigger>
-            <SelectContent>
-              {accounts.map((a) => (
-                <SelectItem key={a.id} value={a.id}>
-                  {a.icon ?? ""} {a.name}
-                </SelectItem>
+          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+            {accounts
+              .filter((a) => a.id !== accountId)
+              .map((a) => (
+                <AccountCard
+                  key={a.id}
+                  account={a}
+                  selected={toAccountId === a.id}
+                  onSelect={() => setValue("toAccountId", a.id)}
+                  showBalance={false}
+                />
               ))}
-            </SelectContent>
-          </Select>
+          </div>
         </div>
       )}
 
       {/* Category */}
       {needsCategory && (
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           <Label>Category</Label>
           <div className="grid grid-cols-4 gap-2">
             {categories.map((c) => (
@@ -175,9 +231,9 @@ export function AddTransactionForm({ accounts, expenseCategories, incomeCategori
                 key={c.id}
                 type="button"
                 onClick={() => setValue("categoryId", c.id)}
-                className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all text-xs ${
-                  watch("categoryId") === c.id
-                    ? "border-indigo-600 bg-indigo-50"
+                className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all ${
+                  categoryId === c.id
+                    ? "border-indigo-600 bg-indigo-50 dark:bg-indigo-950/30"
                     : "border-border bg-muted/30"
                 }`}
               >
@@ -191,18 +247,24 @@ export function AddTransactionForm({ accounts, expenseCategories, incomeCategori
 
       {/* Person */}
       {needsPerson && (
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           <Label>Person</Label>
-          <Select onValueChange={(v: string | null) => setValue("personId", v ?? undefined)}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select person" />
-            </SelectTrigger>
-            <SelectContent>
+          {people.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-2">
+              No people yet. Add one from the People tab.
+            </p>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
               {people.map((p) => (
-                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                <PersonCard
+                  key={p.id}
+                  person={p}
+                  selected={personId === p.id}
+                  onSelect={() => setValue("personId", p.id, { shouldValidate: true })}
+                />
               ))}
-            </SelectContent>
-          </Select>
+            </div>
+          )}
         </div>
       )}
 
@@ -212,7 +274,7 @@ export function AddTransactionForm({ accounts, expenseCategories, incomeCategori
         <Textarea id="note" placeholder="Add a note..." rows={2} {...register("note")} />
       </div>
 
-      <Button type="submit" disabled={loading} className="h-12 text-base bg-indigo-600 hover:bg-indigo-700">
+      <Button type="submit" disabled={loading} className="h-12 text-base bg-indigo-600 hover:bg-indigo-700 mt-1">
         {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
         Save Transaction
       </Button>
