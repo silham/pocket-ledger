@@ -2,12 +2,20 @@ const STATIC_CACHE = 'pl-static-v1';
 const DYNAMIC_CACHE = 'pl-dynamic-v1';
 const API_CACHE = 'pl-api-v1';
 
-const PRECACHE_URLS = ['/offline', '/'];
+const OFFLINE_URLS = ['/offline'];
+const STATIC_PRECACHE_URLS = [
+  '/manifest.json',
+  '/icons/icon-192.svg',
+  '/icons/icon-512.svg',
+];
 
-// Install: precache offline fallback and shell
+// Install: precache offline fallback and stable PWA assets
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(DYNAMIC_CACHE).then((cache) => cache.addAll(PRECACHE_URLS))
+    Promise.all([
+      caches.open(DYNAMIC_CACHE).then((cache) => cache.addAll(OFFLINE_URLS)),
+      caches.open(STATIC_CACHE).then((cache) => cache.addAll(STATIC_PRECACHE_URLS)),
+    ])
   );
   self.skipWaiting();
 });
@@ -33,8 +41,12 @@ self.addEventListener('fetch', (event) => {
   // Never cache mutations
   if (request.method !== 'GET') return;
 
-  // Static assets (content-hashed) — Cache First, 365 day TTL
-  if (url.pathname.startsWith('/_next/static/') || url.pathname.startsWith('/icons/')) {
+  // Static assets (content-hashed) and PWA metadata — Cache First
+  if (
+    url.pathname.startsWith('/_next/static/') ||
+    url.pathname.startsWith('/icons/') ||
+    url.pathname === '/manifest.json'
+  ) {
     event.respondWith(cacheFirst(request, STATIC_CACHE));
     return;
   }
@@ -50,8 +62,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // App pages — Stale While Revalidate (instant load, update in background)
-  event.respondWith(staleWhileRevalidate(request, DYNAMIC_CACHE));
+  // App pages — Network First, offline fallback only when the network fails
+  event.respondWith(networkFirstPage(request, DYNAMIC_CACHE, 5000));
 });
 
 async function cacheFirst(request, cacheName) {
@@ -87,16 +99,18 @@ async function networkFirst(request, cacheName, timeoutMs = 5000) {
   }
 }
 
-async function staleWhileRevalidate(request, cacheName) {
+async function networkFirstPage(request, cacheName, timeoutMs = 5000) {
   const cache = await caches.open(cacheName);
-  const cached = await cache.match(request);
-
-  const fetchPromise = fetch(request).then((response) => {
+  try {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeoutMs);
+    const response = await fetch(request, { signal: controller.signal });
+    clearTimeout(id);
     if (response.ok) cache.put(request, response.clone());
     return response;
-  }).catch(() => null);
-
-  return cached ?? (await fetchPromise) ?? offlineFallback();
+  } catch {
+    return offlineFallback();
+  }
 }
 
 async function offlineFallback() {
